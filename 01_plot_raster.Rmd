@@ -1,0 +1,72 @@
+---
+title: "01_plot_raster"
+output: html_document
+---
+
+## Set up
+
+### Libraries + functions
+```{r setup, include=FALSE}
+library(raster)
+library(foreign)
+
+source("01fun_plot_raster_functions.R")
+```
+
+### Raster data
+```{r}
+folder_tif <- "C:/Data/Star-Walk/g100_clc12_V18_5"
+fn <- paste0(folder_tif, "/g100_clc12_V18_5.tif")
+raster_corine <- raster(fn)
+```
+
+### Make data for legend  
+Makes data frame 'df_classes'
+```{r}
+# 1. Get classes with 'BinValues' code from r@data@attributes (df_classes)
+# 2. Get colorcodes from dbf file (df_colors)
+# 3. Combine the two
+
+#str(raster_corine, 2)
+#str(raster_corine@data@attributes, 2)
+
+df_classes <- raster_corine@data@attributes[[1]]
+#head(df_classes)
+
+df_classes$Color <- raster_corine@legend@colortable[1:nrow(df_classes)]
+df_colors <- read.dbf(paste0(folder_tif, "/g100_clc12_V18_5.tif.vat.dbf"))
+# head(df_colors)
+
+df_classes <- base::merge(df_classes, df_colors, by.x = "BinValues", by.y = "Value")
+# legend("topright", legend = df_classes$LABEL3, fill = df_classes$Color)
+# df_classes$LABEL3
+
+# Area class for print (shortened the "Mostly agriculture..." class)
+df_classes$Area_type <- df_classes$LABEL3
+levels(df_classes$Area_type)[22] <- "Agriculture with significant areas of natural vegetation"
+# legend("topright", legend = df_classes$Area_type, fill = df_classes$Color)
+
+# Code + area class
+factorToChar <- function(x) levels(x)[as.numeric(x)]
+df_classes$Area_type2 <- paste(factorToChar(df_classes$CLC_CODE), factorToChar(df_classes$Area_type))
+
+```
+
+## Crop to Lake Ohrid
+```{r}
+######################################################################
+#
+# Crop to Lake Ohrid
+#
+######################################################################
+
+f3 <- extent(5212458, 5235640, 2036437, 2076818)
+raster_ohrid <- crop(raster_corine, f3)
+```
+
+```{r}
+plotRaster(raster_ohrid, extend.x = 0.4)
+plotRaster(raster_ohrid, extend.x = 0.4, windows = FALSE)
+plotRaster(raster_ohrid, extend.x = 0.4, file = "Figures/01_Corine_Lake_Ohrid.png")
+```
+
