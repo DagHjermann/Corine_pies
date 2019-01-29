@@ -31,7 +31,7 @@ Makes data frame 'df_classes'
 #str(raster_corine@data@attributes, 2)
 
 df_classes <- raster_corine@data@attributes[[1]]
-#head(df_classes)
+# head(df_classes)
 
 df_classes$Color <- raster_corine@legend@colortable[1:nrow(df_classes)]
 df_colors <- read.dbf(paste0(folder_tif, "/g100_clc12_V18_5.tif.vat.dbf"))
