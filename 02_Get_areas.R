@@ -7,7 +7,7 @@ library(dplyr)
 library(ggplot2)
 
 source("01fun_plot_raster_functions.R")
-source("02fun_Get_angles_functions.R")
+source("02fun_Get_areas_functions.R")
 
 ### Raster data
 folder_tif <- "C:/Data/Star-Walk/g100_clc12_V18_5"
