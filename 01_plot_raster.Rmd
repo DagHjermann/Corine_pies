@@ -65,8 +65,23 @@ raster_ohrid <- crop(raster_corine, f3)
 ```
 
 ```{r}
-plotRaster(raster_ohrid, extend.x = 0.4)
+# plotRaster(raster_ohrid, extend.x = 0.4)
 plotRaster(raster_ohrid, extend.x = 0.4, windows = FALSE)
 plotRaster(raster_ohrid, extend.x = 0.4, file = "Figures/01_Corine_Lake_Ohrid.png")
+```
+
+## Plot Lura
+```{r}
+### Site data
+df_sites <- readRDS("Data/02_df_sites.rds")
+
+picked_lake <- "Lura"
+df_sites_pick <- subset(df_sites, lake %in% picked_lake)
+coord_pick <- sf::st_coordinates(df_sites_pick)
+raster_pick <- get_raster_pick(df_sites_pick)
+plot(raster_pick)
+debugonce(plotRaster)
+plotRaster(raster_pick, file = sprintf("Figures/01_Corine_Lake_%s.png", picked_lake), pointdata = coord_pick)
+
 ```
 

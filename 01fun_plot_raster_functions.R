@@ -26,6 +26,18 @@ areaTab <- function(raster){
   df2
   }
 
+# Get CORINE raster for data (e.g. point data) pluss 1000 m to each side
+get_raster_pick <- function(data,
+                            dx = 1000, dy = 1000,
+                            raster = raster_corine){
+  ext <- extent(data)
+  ext@xmin <- ext@xmin - dx
+  ext@xmax <- ext@xmax + dx
+  ext@ymin <- ext@ymin - dy
+  ext@ymax <- ext@ymax + dy
+  crop(raster_corine, ext)
+}
+
 # Makes a file suitable for plotting with image()
 # Input: raster object
 # Output: list with x vector, y vector and a z matrix
@@ -53,7 +65,7 @@ classToNum <- function(x)
 # If it gives no map, just the legend, just run it again :-)
 
 plotRaster <- function(raster, windows = TRUE, legend = TRUE, file = NULL,
-                       extend.x = 0, extend.y = 0){
+                       extend.x = NULL, extend.y = NULL, pointdata = NULL){
   rd <- rasterToImage(raster)
   df <- areaTab(raster)
   df$BinValues <- classToNum(df$BinValues)
@@ -65,11 +77,25 @@ plotRaster <- function(raster, windows = TRUE, legend = TRUE, file = NULL,
         res = 150, type="cairo", antialias="default")
   if (legend)
     par(mfcol = c(1,2), mar = c(4,5,2,1))
+  if (is.null(extend.x) & is.null(extend.y)){
+    x_y_ratio <- diff(range(rd$x))/diff(range(rd$y))
+    if (x_y_ratio > 1){
+      extend.x <- 0; extend.y <- 1 - x_y_ratio
+    } else {
+      extend.x <- 1 - x_y_ratio; extend.y <- 0
+    }
+  } else {
+    extend.x <- ifelse(is.null(extend.x), 0, extend.x)
+    extend.y <- ifelse(is.null(extend.y), 0, extend.y)
+  }
   ext.x <- extend.x*diff(range(rd$x))
   ext.y <- extend.y*diff(range(rd$y))
   image(rd, useRaster = TRUE, breaks=c(0, df$BinValues+0.5), col = df$Color,
         xlim = c(min(rd$x) - ext.x, max(rd$x) + ext.x),
         ylim = c(min(rd$y) - ext.y, max(rd$y) + ext.y))
+  if (!is.null(pointdata)){
+    points(pointdata)
+  }
   if (legend){
     plot(0,0, type="n", axes = FALSE, xlab = "", ylab = "")
     legend("topright", legend = paste0(df$Area_type2, " (", df$Perc, "%)"), fill = df$Color)
