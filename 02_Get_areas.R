@@ -1,8 +1,7 @@
-
 ### Libraries + functions
-library(raster)
-library(foreign)
-library(sf)
+library(raster)     # raster(), extent()
+library(foreign)    # read.dbf()
+library(sf)         # st_*()
 library(dplyr)
 library(ggplot2)
 
@@ -13,6 +12,32 @@ source("02fun_Get_areas_functions.R")
 folder_tif <- "C:/Data/Star-Walk/g100_clc12_V18_5"
 fn <- paste0(folder_tif, "/g100_clc12_V18_5.tif")
 raster_corine <- raster(fn)
+
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+#
+# Create CORINE classes lookup table
+# From "\\niva-of5\osl-userdata$\DHJ\Documents\seksjon 318\Star-Walk\Corine\read raster 2012.R"
+#
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+
+corine_classes <- raster_corine@data@attributes[[1]]
+corine_classes$Color <- raster_corine@legend@colortable[1:nrow(corine_classes)]
+df_colors <- read.dbf(paste0(folder_tif, "/g100_clc12_V18_5.tif.vat.dbf"))
+corine_classes <- base::merge(corine_classes, df_colors, by.x = "BinValues", by.y = "Value")
+# corine_classes$LABEL3
+
+# Area class for print (shortened the "Mostly agriculture..." class)
+corine_classes$Area_type <- corine_classes$LABEL3
+levels(corine_classes$Area_type)[22] <- "Agriculture with significant areas of natural vegetation"
+# legend("topright", legend = corine_classes$Area_type, fill = corine_classes$Color)
+
+# Code + area class
+factorToChar <- function(x) levels(x)[as.numeric(x)]
+corine_classes$Area_type2 <- paste(factorToChar(corine_classes$CLC_CODE), factorToChar(corine_classes$Area_type))
+
+corine_classes$ID <- NULL   # This is just confusing, so we delete it
+
+# openxlsx::write.xlsx(corine_classes, "Data/02_CORINE_classes.xlsx")
 
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 #
@@ -58,6 +83,9 @@ st_geometry(df_sites) <- st_sfc(point_list, crs = 4326)
 # See: https://land.copernicus.eu/pan-european/corine-land-cover/clc-2012?tab=metadata
 df_sites <- df_sites %>% st_transform(3035) 
 
+# Save
+# saveRDS(df_sites, "Data/02_df_sites.rds")
+
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 #
 # Plot Ohrid sites ----
@@ -89,7 +117,8 @@ interactive <- FALSE   # set to TRUE if you want to click your way through all t
 
 if (interactive){   # Go through each site
   for (i in 1:N){
-    ok <- "n"
+  # for (i in 13:18){
+  ok <- "n"
     while (ok != "y"){
       angles[i] <- get_angle_from_click(i)
       ok <- readline(prompt = "Hit 'y' if OK, 'n' otherwise ")
@@ -98,6 +127,8 @@ if (interactive){   # Go through each site
 } else {            # or use the saved values
   angles <- readRDS("Data/02_angles.rds")
 }
+
+
 
 #
 # save as RDS
@@ -145,6 +176,7 @@ data_df <- as.data.frame(df_sites)
 
 # Make "_a" plots
 for (i in seq_len(nrow(df_sites))){
+# for (i in 13:18){
   png(sprintf("Figures/Siteplots/Site%02.f_a.png", i), width = 20, height = 20, units = "cm", res = 200)
   plot_site_trapeze(i)
   dev.off()
@@ -193,6 +225,18 @@ areas_landuse <- areas_landuse_raw %>%
   group_by(i, lake, site, name, Land_use) %>%
   summarise(Area = sum(Area))
 
+areas_landuse <- left_join(
+  areas_landuse %>% mutate(Land_use = as.numeric(Land_use)), 
+  corine_classes %>% select(BinValues, Color, CLC_CODE, Area_type, Area_type2),
+  by = c("Land_use" = "BinValues") 
+)
+
+areas_landuse_broad <- areas_landuse %>%
+  select(i, lake, site, name, Area_type2, Area) %>%
+  tidyr::spread(Area_type2, Area)
+
+# openxlsx::write.xlsx(areas_landuse, "Data/02_LandUse_10ha_trapeze.xlsx")
+# openxlsx::write.xlsx(areas_landuse_broad, "Data/02_LandUse_10ha_trapeze_bred.xlsx")
 
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 #
@@ -200,13 +244,21 @@ areas_landuse <- areas_landuse_raw %>%
 #
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 
+# Get colors (in the same order as the unique Area_type2 values)
+cols <- areas_landuse %>%
+  group_by(Area_type2) %>%
+  summarise(Color = first(Color)) %>%
+  pull(Color)
+
 areas_landuse %>%
   as.data.frame() %>%
-  mutate(Lake_site = factor(paste(lake,site))) %>%
-  mutate(Lake_site = factor(Lake_site, levels = rev(levels(Lake_site)))) %>% 
-  ggplot(aes(Lake_site, Area, fill = Land_use)) + 
+  mutate(Lake_site = factor(paste(lake,site))) %>%                             # These two lines are required 
+  mutate(Lake_site = factor(Lake_site, levels = rev(levels(Lake_site)))) %>%   # only to put lakes in correct order
+  ggplot(aes(Lake_site, Area, fill = Area_type2)) + 
   geom_col() +
+  scale_fill_manual(values = cols) +
   coord_flip() 
+ggsave("Figures/02_Land_use_10ha_trapeze.png", width = 9, dpi = 500)
 
 
 
