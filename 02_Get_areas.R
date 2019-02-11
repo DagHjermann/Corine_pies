@@ -55,8 +55,16 @@ raster_ohrid <- crop(raster_corine, ext)
 #
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 
-df_sites <- readxl::read_excel("Data/STAR-WALK sites.xlsx")
+# Used this one first, positions were edited using script 06 later
+# df_sites <- readxl::read_excel("Data/STAR-WALK sites.xlsx")
+
+# Positions after editing using script 06
+df_sites <- readxl::read_excel("Data/STAR-WALK sites adjusted.xlsx", sheet = "For R import")
 # df_sites
+
+sel <- !is.na(df_sites$`Nlatitude NEW`)
+df_sites$Nlatitude[sel] <- df_sites$`Nlatitude NEW`[sel]
+df_sites$Elongitude[sel] <- df_sites$`Elongitude NEW`[sel]
 
 # Function to make a separaet point from each line of data
 # Note: don't make multipoints, then you cannot set data for each point
@@ -83,8 +91,14 @@ st_geometry(df_sites) <- st_sfc(point_list, crs = 4326)
 # See: https://land.copernicus.eu/pan-european/corine-land-cover/clc-2012?tab=metadata
 df_sites <- df_sites %>% st_transform(3035) 
 
-# Save
+
+# NOTE: these points were adjusted at the bottom of this script, then adjusted 
+#  coordinates were inserted back into Excel (so all data should be consistent now)
+
+# file.copy("Data/02_df_sites.rds", "Data/02_df_sites_OLD.rds") # after manual editing
 # saveRDS(df_sites, "Data/02_df_sites.rds")
+
+
 
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 #
@@ -97,7 +111,12 @@ points(subset(df_sites, lake == "Ohrid") %>% st_coordinates(), pch = 20, col = 1
 
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 #
-# Get all angles ----
+# Get all angles 1 ----
+#
+# 'angles', readRDS("Data/02_angles.rds")
+# NOTE: we end up using these only temporarily
+# The final angles are 'angle_satellite'
+#
 # If interactive = TRUE, you will find the angles by clicking your way 
 # through a series of maps (one map per site). 
 # If interactive = FSKE, use the stored angles
@@ -128,11 +147,18 @@ if (interactive){   # Go through each site
   angles <- readRDS("Data/02_angles.rds")
 }
 
+# Extra editing
+# i <- 6
+# angles[i] <- get_angle_from_click(i)
+# i <- 8
+# angles[i] <- get_angle_from_click(i)
+
 
 
 #
 # save as RDS
 #
+# file.copy("Data/02_angles.rds", "Data/02_angles_OLD.rds")
 # saveRDS(angles, "Data/02_angles.rds")
 
 #
@@ -143,123 +169,106 @@ if (interactive){   # Go through each site
 # df_sitedata$geometry <- NULL
 # openxlsx::write.xlsx(df_sitedata, "Data/02_Sites_with_angles.xlsx")
 
+# OLD data ()
+# file.copy("Data/02_Sites_with_angles.xlsx", "Data/02_Sites_with_angles_OLD.xlsx")
+
+
 
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 #
-# Check one site ----
+# Get all angles 2 ----
+#
+# Find angles, using satellite pictures and mapedit instead
+# 'angle_satellite', readRDS("Data/02_angle_satellite.rds")
+#
+# If interactive = TRUE, you will find the angles by clicking your way 
+# through a series of maps (one map per site). 
+# If interactive = FSKE, use the stored angles
 #
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 
-plot_site_trapeze(1)
 
-get_trapeze_from_site(1)
-plot(get_trapeze_from_site(1))
+# Click correct position for each point on the lake:
+library(mapedit)
+library(mapview)
 
-# Make trapeze
-trapeze_landuse <- get_trapezeoverlap_from_site(1)
-trapeze_landuse
 
-# Plot
-plot(trapeze_landuse[,"Land_use"])
+interactive <- FALSE
 
-trapeze_landuse_df <- data.frame(Area = st_area(trapeze_landuse), Land_use = trapeze_landuse$Land_use)
-xtabs(Area ~ Land_use, trapeze_landuse_df)
+# angle_satellite <- readRDS("Data/angle_satellite_1to13.rds")
 
-#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
-#
-# Make "_a" plots ----
-#
-#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
-
-# Just data, without geography
-data_df <- as.data.frame(df_sites)
-
-# Make "_a" plots
-for (i in seq_len(nrow(df_sites))){
-# for (i in 13:18){
-  png(sprintf("Figures/Siteplots/Site%02.f_a.png", i), width = 20, height = 20, units = "cm", res = 200)
-  plot_site_trapeze(i)
-  dev.off()
-} 
-
-#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
-#
-# Make "_b" plots and calculate all areas ----
-#
-#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
-
-# Just data, without geography
-data_df <- as.data.frame(df_sites)
-
-# Make all trapeze polygons
-trapezes_landuse <- seq_len(nrow(df_sites)) %>% purrr::map(get_trapezeoverlap_from_site)
-# plot(trapezes_landuse[[i]][,"Land_use"])
-
-# Make "_b" plots
-for (i in seq_len(nrow(df_sites))){
-  title <- paste0("Site ", i, ": ", data_df[i,"lake"], ", ", data_df[i,"site"], " (", data_df[i,"name"], ")")
-  png(sprintf("Figures/Siteplots/Site%02.f_b.png", i), width = 20, height = 20, units = "cm", res = 200)
-  plot(trapezes_landuse[[i]][,"Land_use"], main = "")
-  mtext(title, cex = 1.2, line = 0.5)
-  dev.off()
-  } 
-
-# Getting area for a single site
-get_area_rawdata <- function(i, trapeze_list, data){
-  trapeze = trapeze_list[[i]]
-  data.frame(i = i, 
-             data[i,c("lake","site","name")], 
-             Area = st_area(trapeze), 
-             Land_use = trapeze$Land_use, 
-             stringsAsFactors = FALSE)
-  
+if (interactive){   # Go through each site
+  N <- nrow(df_sites)
+  angle_satellite <- rep(NA, N)
+  for (i in 1:N){
+    angle_satellite[i] <- get_angle_from_click_satellite(i)
+  }
+} else {            # or use the saved values
+  angle_satellite <- readRDS("Data/02_angle_satellite.rds")
 }
 
-# get_area_rawdata(1, trapeze_list = trapezes_landuse, data = data_df)
+# cbind(angles, angle_satellite)
 
-# Getting areas for all sites
-areas_landuse_raw <- seq_len(nrow(df_sites)) %>% purrr::map_df(get_area_rawdata, trapeze_list = trapezes_landuse, data = data_df)
-
-# Getting areas for all sites, summarised
-areas_landuse <- areas_landuse_raw %>%
-  group_by(i, lake, site, name, Land_use) %>%
-  summarise(Area = sum(Area))
-
-areas_landuse <- left_join(
-  areas_landuse %>% mutate(Land_use = as.numeric(Land_use)), 
-  corine_classes %>% select(BinValues, Color, CLC_CODE, Area_type, Area_type2),
-  by = c("Land_use" = "BinValues") 
-)
-
-areas_landuse_broad <- areas_landuse %>%
-  select(i, lake, site, name, Area_type2, Area) %>%
-  tidyr::spread(Area_type2, Area)
-
-# openxlsx::write.xlsx(areas_landuse, "Data/02_LandUse_10ha_trapeze.xlsx")
-# openxlsx::write.xlsx(areas_landuse_broad, "Data/02_LandUse_10ha_trapeze_bred.xlsx")
+# Save result
+# saveRDS(angle_satellite, "Data/02_angle_satellite.rds")
 
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 #
-# Plot area per site
+# Check all points and angles (method 1 and 2) ----
 #
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 
-# Get colors (in the same order as the unique Area_type2 values)
-cols <- areas_landuse %>%
-  group_by(Area_type2) %>%
-  summarise(Color = first(Color)) %>%
-  pull(Color)
+mapview_no <- function(i){
+  mapview(get_trapeze_polygon(i, df_sites, angle_satellite), map.types = "Esri.WorldImagery") +
+    mapview(get_trapeze_polygon(i, df_sites, angles), col.regions = "red")
+}
 
-areas_landuse %>%
-  as.data.frame() %>%
-  mutate(Lake_site = factor(paste(lake,site))) %>%                             # These two lines are required 
-  mutate(Lake_site = factor(Lake_site, levels = rev(levels(Lake_site)))) %>%   # only to put lakes in correct order
-  ggplot(aes(Lake_site, Area, fill = Area_type2)) + 
-  geom_col() +
-  scale_fill_manual(values = cols) +
-  coord_flip() 
-ggsave("Figures/02_Land_use_10ha_trapeze.png", width = 9, dpi = 500)
+# Run through all trapezes using this:
+mapview_no(6)
+
+# For adustment af angle or point (below) using editmap: 
+# click on marker icon (left egde), click once in desired place in map, then click 'done'
+
+# To adjust angle:
+i <- 30
+angle_satellite[i] <- get_angle_from_click_satellite(i)
+# saveRDS(angle_satellite, "Data/02_angle_satellite.rds")
+
+# To adjust point:
+i <- 6
+new_point_feature <- editMap(mapview_site(i))$finished
+new_point <- new_point_feature$geometry %>% st_transform(3035) 
+df_sites[i,]$geometry <- new_point
+# saveRDS(df_sites, "Data/02_df_sites.rds")
 
 
+# keep these 'angles' after manual check
+# i <- c(2, 12, 14, 16, 20, 22, 24, 26, 28, 32, 34, 36)
+# angle_satellite[i] <- angles[i]
+
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+#
+# Save adjusted coordinates and angles in Excel ----
+#
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+
+# Copy coordinates to clipboard - after that, pasted into 'STAR-WALK sites adjusted.xlsx'
+# columns 'Nlatitude NEW',	'Elongitude NEW'
+for_copy <- df_sites %>% 
+  st_transform(crs = 4326) %>% 
+  st_coordinates() %>%
+  .[,c(2,1)] %>%
+  as.data.frame()
+
+for_copy$Angle <- angle_satellite
+
+write.table(for_copy, "clipboard", sep = "\t", dec = ",", col.names = FALSE, row.names = FALSE)
+
+
+# for (i in 1:nrow(df_sites)){
+#   mapview(get_trapeze_polygon(i, df_sites, angle_satellite)) +
+#    mapview(get_trapeze_polygon(i, df_sites, angles), col.regions = "red")
+#   ok <- readline(prompt = "Hit 'y' if OK, 'n' otherwise ")
+#   }
 
 

@@ -167,3 +167,53 @@ get_trapezeoverlap_from_site <- function(i,
 # trapeze_types
 # plot(trapeze_types[,"Land_use"])
 
+#
+# For satellite and mapedit ----
+#
+
+get_raster_site <- function(coor, dm = 1000, raster = raster_corine){
+  raster::crop(raster, extent_site(coor, dm = dm))
+}
+# test <- get_raster_site(df_sites[1,] %>% st_coordinates()) 
+# mapview(test)
+
+
+# Plot raster overlaid on satellite map
+# NOTE: mapview isn't able to plot the rasters correctly, the pixels appear to be a little jumbled up
+mapview_site <- function(i, dm = 1000, 
+                         raster = raster_corine, data = df_sites){
+  coor <- data[i,] %>% st_coordinates()
+  rast <- get_raster_site(coor, dm = dm, raster = raster)
+  mapview(data[i,], map.types = "Esri.WorldImagery") + 
+    mapview(rast, alpha.regions = 0.3)
+}
+
+# debugonce(mapview_site)
+# mapview_site(1)
+
+
+get_angle_from_click_satellite <- function(i, raster = raster_corine, data = df_sites){
+  coor <- data[i,] %>% st_coordinates()
+  pointobj <- editMap(mapview_site(i))$finished
+  coor_click <- st_coordinates(pointobj %>% st_transform(crs = 3035))  
+  # list(coor_point, coor_click)
+  angle <- get_angle(coor_click[,1] - coor[,1], coor_click[,2] - coor[,2])
+  # trapeze <- get_trapeze_from_angle(coor, angle)
+  # trapeze_sf <- st_polygon(list(trapeze)) 
+  # trapeze_sfc <- st_sfc(trapeze_sf, crs = st_crs(data))
+  # mapview_site(i) + trapeze_sfc
+  angle
+}
+
+
+get_trapeze_polygon <- function(i, data, anglevector){
+  coor <- st_coordinates(data[i,])  
+  trapeze <- get_trapeze_from_angle(coor, anglevector[i])
+  trapeze_sf <- st_polygon(list(trapeze)) 
+  trapeze_sfc <- st_sfc(trapeze_sf, crs = st_crs(data))
+  trapeze_sfc
+}
+# mapview(get_trapeze_polygon(1, df_sites, angle_satellite)) +
+#   mapview(get_trapeze_polygon(1, df_sites, angles), col.regions = "red")
+
+
