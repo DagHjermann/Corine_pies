@@ -10,10 +10,10 @@
 #
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 
-library(mapedit)
 library(leaflet)
-
 library(mapview)
+library(mapedit)
+library(sf)
 library(dplyr)
 
 source("04fun_mapview_functions.R")
@@ -48,42 +48,42 @@ df_sites_pick <- subset(df_sites, lake %in% "Ohrid")
 nye_ohrid <- editMap(
   mapview(df_sites_pick, map.types = "Esri.WorldImagery")
 )
-save(nye_ohrid, "nye_ohrid.RData")
+saveRDS(nye_ohrid, "nye_ohrid.RData")
 
 # Click correct position for each point on the lake:
 df_sites_pick <- subset(df_sites, lake %in% "Prespa")
 nye_prespa <- editMap(
   mapview(df_sites_pick, map.types = "Esri.WorldImagery")
 )
-save(nye_prespa, "nye_prespa.RData")
+saveRDS(nye_prespa, "nye_prespa.RData")
 
 # Click correct position for each point on the lake:
 df_sites_pick <- subset(df_sites, lake %in% "Lura")
 nye_lura <- editMap(
   mapview(df_sites_pick, map.types = "Esri.WorldImagery")
 )
-save(nye_lura, "nye_lura.RData")
+saveRDS(nye_lura, "nye_lura.RData")
 
 # Click correct position for each point on the lake:
 df_sites_pick <- subset(df_sites, lake %in% "Sava")
 nye_sava <- editMap(
   mapview(df_sites_pick, map.types = "Esri.WorldImagery")
 )
-save(nye_sava, "nye_sava.Rdata")
+saveRDS(nye_sava, "nye_sava.Rdata")
 
 # Click correct position for each point on the lake:
 df_sites_pick <- subset(df_sites, lake %in% "Biogradsko")
 nye_biogradsko <- editMap(
   mapview(df_sites_pick, map.types = "Esri.WorldImagery")
 )
-save(nye_biogradsko, "nye_biogradsko.RData")
+saveRDS(nye_biogradsko, "nye_biogradsko.RData")
 
 # Click correct position for each point on the lake:
 df_sites_pick <- subset(df_sites, lake %in% "Crno")
 nye_crno <- editMap(
   mapview(df_sites_pick, map.types = "Esri.WorldImagery")
 )
-save(nye_crno, "nye_crno.RData")
+saveRDS(nye_crno, "nye_crno.RData")
 
 
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
@@ -92,11 +92,8 @@ save(nye_crno, "nye_crno.RData")
 #
 #o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
 
-df_sites[]
-
 
 # Check distances
-library(sf)
 
 # Return the p2 point (index 'closest_i") that is closest to p1 point number i
 # Also return closest distance (in meter if crs = 3035 or a UTM)
@@ -202,3 +199,35 @@ df
 df <- df[,c(2,1,4,3,5,6)]
 write.table(df, "clipboard", dec = ",", sep = "\t", row.names = FALSE, col.names = FALSE)
 
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+#
+# Finished positions  ----
+#
+#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o#o
+
+# df_sites <- readxl::read_excel("Data/STAR-WALK sites adjusted.xlsx", sheet = "06_mapedit.R")
+df_sites <- readxl::read_excel("Data/STAR-WALK sites adjusted.xlsx", sheet = "For R import") %>%
+  as.data.frame()
+
+sel <- !is.na(df_sites$`Elongitude NEW`); sum(sel)
+df_sites$`Elongitude`[sel] <- df_sites$`Elongitude NEW`[sel]
+
+sel <- !is.na(df_sites$`Nlatitude NEW`); sum(sel)
+df_sites$`Nlatitude`[sel] <- df_sites$`Nlatitude NEW`[sel]
+
+
+make_point <- function(i, data){
+  df_sites[i,c("Elongitude","Nlatitude")] %>% 
+    as.numeric() %>%
+    st_point()
+}
+# test
+# make_point(2)
+
+# Make list of points
+point_list <- 1:nrow(df_sites) %>% purrr::map(make_point)
+
+# Turn site data into sf object; also set crs (lat / long)
+st_geometry(df_sites) <- st_sfc(point_list, crs = 4326)
+
+mapview(df_sites)
